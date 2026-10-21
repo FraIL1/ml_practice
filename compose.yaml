@@ -1,0 +1,51 @@
+name: ml_practice
+
+services:
+  s3:
+    image: rustfs/rustfs:latest
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_USER}
+      RUSTFS_SECRET_KEY: ${S3_PASSWORD}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes:
+      - s3-data:/data
+    command: ["/data"]
+    restart: unless-stopped
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_USER}
+      AWS_SECRET_ACCESS_KEY: ${S3_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      MLFLOW_S3_ENDPOINT_URL: http://s3:9000
+    volumes:
+      - mlflow-data:/mlflow
+    command:
+      - mlflow
+      - server
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --serve-artifacts
+      - --artifacts-destination
+      - s3://mlflow
+    depends_on:
+      - s3
+    restart: unless-stopped
+
+volumes:
+  s3-data:
+  mlflow-data:
